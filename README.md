@@ -1,8 +1,7 @@
-![Darknet Logo](http://pjreddie.com/media/files/darknet-black-small.png)
+#Tracker
+It's my little try to combine YOLOv3 and SORT with a poor reidentification function.
 
-# Darknet #
-Darknet is an open source neural network framework written in C and CUDA. It is fast, easy to install, and supports CPU and GPU computation.
+For more information of YOLOv3, see the [Darknet project website](http://pjreddie.com/darknet).
+For more information of SORT, see the [SORT](https://github.com/abewley/sort).
 
-For more information see the [Darknet project website](http://pjreddie.com/darknet).
-
-For questions or issues please use the [Google Group](https://groups.google.com/forum/#!forum/darknet).
+No commercial usage, just like a homework.
