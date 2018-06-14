@@ -53,7 +53,21 @@ def iou(bb_test,bb_gt):
   wh = w * h
   o = wh / ((bb_test[2]-bb_test[0])*(bb_test[3]-bb_test[1])
     + (bb_gt[2]-bb_gt[0])*(bb_gt[3]-bb_gt[1]) - wh)
+
   return(o)
+
+@jit
+def cosine_distance(det_feature, trk_features):
+  """ Compute the maximum cosine distance between measurement feature and tracker features
+  """
+  max_cosine = 0.0
+  for trk_feature in trk_features:
+    cosine = np.dot(det_feature, trk_feature)
+    if cosine > max_cosine:
+      max_cosine = cosine
+
+  return max_cosine
+
 
 def convert_bbox_to_z(bbox):
   """
@@ -66,7 +80,7 @@ def convert_bbox_to_z(bbox):
   x = bbox[0]+w/2.
   y = bbox[1]+h/2.
   s = w*h    #scale is just area
-  r = w/float(h)
+  r = w/float(h) # aspect ratio
   return np.array([x,y,s,r]).reshape((4,1))
 
 def convert_x_to_bbox(x,score=None):
@@ -87,7 +101,7 @@ class KalmanBoxTracker(object):
   This class represents the internel state of individual tracked objects observed as bbox.
   """
   count = 0 # How many object been tracked
-  def __init__(self, bbox, trk_id=None):
+  def __init__(self, bbox, feature, trk_id=None):
     """
     Initialises a tracker using initial bounding box.
     """
@@ -116,13 +130,18 @@ class KalmanBoxTracker(object):
     else:
       self.id = trk_id
     self.history = []
-    self.hits = 0
-    self.hit_streak = 0
+    self.hits = 0 # total number of updates
+    self.hit_streak = 0 # consective number of updates (probationary perirod)
     self.age = 0
 
-  def update(self,bbox):
+    self.features = []
+    if feature is not None:
+      self.features.append(feature)
+
+  def update(self,bbox,feature):
     """
     Updates the state vector with observed bbox.
+    (Unnecessarily update in every frame)
     """
     self.time_since_update = 0
     self.history = []
@@ -130,9 +149,14 @@ class KalmanBoxTracker(object):
     self.hit_streak += 1
     self.kf.update(convert_bbox_to_z(bbox))
 
+    self.features.append(feature)
+    if len(self.features) > 100:
+      self.features.pop(0)
+
   def predict(self):
     """
     Advances the state vector and returns the predicted bounding box estimate.
+    (Predict in every frame)
     """
     if((self.kf.x[6]+self.kf.x[2])<=0):
       self.kf.x[6] *= 0.0
@@ -152,35 +176,53 @@ class KalmanBoxTracker(object):
 
 
 
-def associate_detections_to_trackers(detections, trackers, iou_threshold=0.3):
+def associate_detections_to_trackers(detections, features, trackers, iou_threshold=0.3):
   """
   Assigns detections to tracked object (both represented as bounding boxes)
 
   Returns 3 lists of matches, unmatched_detections and unmatched_trackers
   """
-  if(len(trackers)==0):
+  # Get predicted locations from existing trackers.
+  trks = np.zeros((len(trackers),5))
+  to_del = []
+  for t,trk in enumerate(trks):
+    pos = trackers[t].predict()[0]
+    trk[:] = [pos[0], pos[1], pos[2], pos[3], 0]
+    if(np.any(np.isnan(pos))):
+      print("predict nan")
+      to_del.append(t)
+  trks = np.ma.compress_rows(np.ma.masked_invalid(trks))  # invalid: nan, inf
+  for t in reversed(to_del):
+    trackers.pop(t)
+  if len(trks) != len(trackers):
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+
+  if(len(trks)==0):
     return np.empty((0,2),dtype=int), np.arange(len(detections)), np.empty((0,5),dtype=int)
 
-  iou_matrix = np.zeros((len(detections),len(trackers)),dtype=np.float32)
+  iou_matrix = np.zeros((len(detections),len(trks)),dtype=np.float32)
+  fcd_matrix = np.zeros((len(detections),len(trks)),dtype=np.float32)
 
   for d,det in enumerate(detections):
-    for t,trk in enumerate(trackers):
+    for t,trk in enumerate(trks):
       iou_matrix[d,t] = iou(det,trk)
-  matched_indices = linear_assignment(-iou_matrix)
+      fcd_matrix[d,t] = cosine_distance(features[d,:], trackers[t].features)
+  cost_matrix = iou_matrix + fcd_matrix  
+  matched_indices = linear_assignment(-cost_matrix)
   
   unmatched_detections = []
   for d,det in enumerate(detections):
     if(d not in matched_indices[:,0]):
       unmatched_detections.append(d)
   unmatched_trackers = []
-  for t,trk in enumerate(trackers):
+  for t,trk in enumerate(trks):
     if(t not in matched_indices[:,1]):
       unmatched_trackers.append(t)
 
   # Filter out matched with low IOU
   matches = []
   for m in matched_indices:
-    if(iou_matrix[m[0],m[1]]<iou_threshold):
+    if(iou_matrix[m[0],m[1]]<iou_threshold) and (fcd_matrix[m[0],m[1]]<0.9):
       unmatched_detections.append(m[0])
       unmatched_trackers.append(m[1])
     else:
@@ -216,82 +258,37 @@ class Sort(object):
     NOTE: The number of objects returned may differ from the number of detections provided.
     """
     self.frame_count += 1
-    # Get predicted locations from existing trackers.
-    trks = np.zeros((len(self.trackers),5))
-    to_del = []
     ret = []
-    for t,trk in enumerate(trks):
-      pos = self.trackers[t].predict()[0]
-      trk[:] = [pos[0], pos[1], pos[2], pos[3], 0]
-      if(np.any(np.isnan(pos))):
-        to_del.append(t)
 
-    trks = np.ma.compress_rows(np.ma.masked_invalid(trks))
-    for t in reversed(to_del):
-      # print("------------------------- 1")
-      self.trackers.pop(t)
-
-    if self.frame_count < 10:
-      matched, unmatched_dets, unmatched_trks = associate_detections_to_trackers(dets, trks, iou_threshold=0.0)
-    else:
-      matched, unmatched_dets, unmatched_trks = associate_detections_to_trackers(dets, trks, iou_threshold=0.3)
+    matched, unmatched_dets, unmatched_trks = associate_detections_to_trackers(dets, feats, self.trackers, iou_threshold=0.3)
 
     # Update matched trackers with assigned detections
     for t,trk in enumerate(self.trackers):
       if(t not in unmatched_trks):
         d = matched[np.where(matched[:,1]==t)[0], 0]
-        trk.update(dets[d,:][0])
+        trk.update(dets[d,:][0], feats[d,:][0])
 
     # Create and initialise new trackers for unmatched detections
     for i in unmatched_dets:
-      # If similar person has appeared, give it the same identity
-      if len(self.trks_feat) == 0:
-        trk = KalmanBoxTracker(dets[i,:])
-        self.trackers.append(trk)
-        self.trks_feat[trk.id] = [ feats[i,:] ]
-        self.trks_feat_sinceused[trk.id] = 0
-      else:
-        max_cosine = 0.0
-        trk_id = 0
-        for key in self.trks_feat_sinceused:
-          self.trks_feat_sinceused[key] += 1
-        for trk_i, trk_feats in self.trks_feat.items():
-          for trk_feat in trk_feats:
-            cosine = np.dot(feats[i,:], trk_feat)
-            if cosine > max_cosine:
-              max_cosine = cosine
-              trk_id = trk_i
-        if max_cosine > 0.95:
-          trk = KalmanBoxTracker(dets[i,:], trk_id=trk_id)
-          self.trackers.append(trk)
-          self.trks_feat[trk_id].append(feats[i,:])
-          self.trks_feat_sinceused[trk_id] = 0
-        else:
-          trk = KalmanBoxTracker(dets[i,:])
-          self.trackers.append(trk)
-          self.trks_feat[trk.id] = [ feats[i,:] ]
-          self.trks_feat_sinceused[trk.id] = 0
-
-    # Keep number of track features <= 100
-    for trk_i, trk_feats in self.trks_feat.items():
-      if len(trk_feats) > 100:
-        self.trks_feat[trk_i].pop(0)
-    # Remove dead track feature
-    for trk_i, value in self.trks_feat_sinceused.items():
-      if value > 300:
-        self.trks_feat_sinceused.pop(trk_i)
+      trk = KalmanBoxTracker(dets[i,:], feats[i,:])
+      self.trackers.append(trk)
 
     i = len(self.trackers)
     for trk in reversed(self.trackers):  # why reverse? pop later!
       d = trk.get_state()[0]
-      if ( (trk.time_since_update < self.max_age)  and  (trk.hit_streak >= self.min_hits or self.frame_count <= self.min_hits) ):
-        ret.append(np.concatenate((d, [trk.id+1])).reshape(1,-1)) # +1 as MOT benchmark requires positive
+        
       i -= 1
 
       # Remove dead tracklet
       if (trk.time_since_update > self.max_age):
         self.trackers.pop(i)
-    
+      else:
+        # Pass probationary period
+        if (trk.hit_streak >= self.min_hits or self.frame_count <= self.min_hits):
+          ret.append(np.concatenate((d, [trk.id+1])).reshape(1,-1)) # +1 as MOT benchmark requires positive
+        elif trk.hits >= 30 and trk.time_since_update < self.min_hits:
+          ret.append(np.concatenate((d, [trk.id+1])).reshape(1,-1)) # +1 as MOT benchmark requires positive
+          
     if(len(ret)>0):
       return np.concatenate(ret)
     return np.empty((0,5))
@@ -329,12 +326,12 @@ if __name__ == '__main__':
     os.makedirs('output')
   
   for vid, det in enumerate(detections):
-    mot_tracker = Sort(max_age=10, min_hits=0) # create instance of the SORT tracker
+    mot_tracker = Sort(max_age=150, min_hits=3) # create instance of the SORT tracker
     seq_dets = np.loadtxt(det, delimiter=',') # load detections
     video_name = splitext(basename(det))[0]
 
-    if video_name != "person2_2":
-      continue
+    # if video_name != "person14_1":
+    #   continue
 
     with open('reid_output/' + video_name + '.txt', 'w') as out_file:
       print("Processing %s." % video_name)
@@ -360,10 +357,10 @@ if __name__ == '__main__':
         fe_s = time.time()
         feats = np.zeros((dets.shape[0], 16))
         for det_id in range(len(feats)):
-          x1 = int(dets[det_id, 0])
-          y1 = int(dets[det_id, 1])
-          x2 = int(dets[det_id, 2])
-          y2 = int(dets[det_id, 3])
+          x1 = max(int(dets[det_id, 0]), 0)
+          y1 = max(int(dets[det_id, 1]), 0)
+          x2 = min(int(dets[det_id, 2]), img.shape[1]-1)
+          y2 = min(int(dets[det_id, 3]), img.shape[0]-1)
           feat = scncd.compute(img[y1:y2, x1:x2])
           feats[det_id] = feat
         cycle_time = time.time() - fe_s
@@ -381,7 +378,7 @@ if __name__ == '__main__':
           print('%d,%d,%.2f,%.2f,%.2f,%.2f,1,-1,-1,-1' % (frame, d[4] ,d[0] ,d[1], d[2]-d[0], d[3]-d[1]), file=out_file)
 
         # print("\n------------ {}th frmae done ---------------".format(frame))
-        # if frame == 100 and video_name == "person4_1":
+        # if frame == 10:
         #   exit()
         
     outputs += [os.getcwd() + '/reid_output/' + video_name + '.txt']
