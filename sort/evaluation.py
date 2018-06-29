@@ -123,6 +123,7 @@ def average_IOU(annots, outputs, file_name):
     
     return total_avg_iou, total_lost
 
+
 def overlap_precision(annots, outputs, threshold):
     nb_video = len(annots)
     total_precision = 0.0

@@ -287,12 +287,12 @@ if __name__ == '__main__':
     os.makedirs('output')
   
   for det in detections:
-    mot_tracker = Sort(max_age=10, min_hits=0) # create instance of the SORT tracker
+    mot_tracker = Sort(max_age=10, min_hits=3) # create instance of the SORT tracker
     seq_dets = np.loadtxt(det, delimiter=',') # load detections
     video_name = splitext(basename(det))[0]
 
-    # if video_name != "person14_2":
-    #   continue
+    if video_name != "person14_1":
+      continue
 
     with open('kf_output/' + video_name + '.txt', 'w') as out_file:
       print("Processing %s." % video_name)

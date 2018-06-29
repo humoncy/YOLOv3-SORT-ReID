@@ -61,26 +61,25 @@ def _main_(args):
     for video_folder in video_folders_list:
         video_name = basename(video_folder)
 
-        if video_name != "person14_1":
-            continue
+        #if video_name != "person14_3":
+        #    continue
 
         print("Processing %s." % video_name)
         image_paths = sorted(glob.glob(os.path.join(video_folder, '*jpg')))
         sort_nicely(image_paths)
 
-        with open('det_mot/' + video_name + '.txt', 'w') as out_file:
+        with open('det_mot_thr45/' + video_name + '.txt', 'w') as out_file:
             for i in tqdm(range(len(image_paths))):
                 # image = cv2.imread(image_paths[i])
-                results = dn.detect(net, meta, image_paths[i])
+                results = dn.detect(net, meta, image_paths[i], thresh=0.45, nms=0.5)
 
                 for r in results:
-                    if r[0] == 'person' and r[1] > 0.87:
+                    if r[0] == 'person' and r[1] > 0.88:
                         box = BoundBox(r[2][0], r[2][1], r[2][2], r[2][3], r[1], r[0])
                         x1 = (box.x - box.w/2)
                         y1 = (box.y - box.h/2)
                         print('%d,-1,%.2f,%.2f,%.2f,%.2f,%.6f,-1,-1,-1' % (i+1, x1, y1, box.w, box.h, box.c), file=out_file)
         
-        break
                     
 
 if __name__ == '__main__':

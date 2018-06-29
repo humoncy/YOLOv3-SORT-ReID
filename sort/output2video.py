@@ -48,11 +48,14 @@ def store_output(result_dir, video_dir):
 
         ##############################################################################
         # Modify here to ouput only one video.
-        if video_name != 'person14_1':
+        if video_name != 'person22':
             continue
         ##############################################################################
+
+        store_path = 'output_video/' + video_name + '_pretty.avi'
+        print("Store path:", store_path)
         
-        video_writer = cv2.VideoWriter('reid_output_video/' + video_name + '_.avi', cv2.VideoWriter_fourcc('M','J','P','G'), FPS, (frame_width, frame_height))
+        video_writer = cv2.VideoWriter(store_path, cv2.VideoWriter_fourcc('M','J','P','G'), FPS, (frame_width, frame_height))
         video_folder = os.path.join(video_dir, video_name)
 
         image_paths = sorted(glob.glob(os.path.join(video_folder, '*.jpg')))
@@ -75,28 +78,32 @@ def store_output(result_dir, video_dir):
                         (int(trk_result[index, 4]),int(trk_result[index, 5])), 
                         color, 3)
 
-                    # Tag rectangle (filled rect)
-                    cv2.rectangle(image, 
-                        (int(trk_result[index, 2])-2,int(trk_result[index, 3]-20)), 
-                        (int(trk_result[index, 2])+20+int(trk_result[index,1])//10 ,int(trk_result[index, 3])+1), 
-                        color, -1)
+                    # # Tag rectangle (filled rect)
+                    # cv2.rectangle(image, 
+                    #     (int(trk_result[index, 2])-2,int(trk_result[index, 3]-20)), 
+                    #     (int(trk_result[index, 2])+20+int(trk_result[index,1])//10 ,int(trk_result[index, 3])+1), 
+                    #     color, -1)
 
-                    # Index tag
-                    cv2.putText(image, 
-                        str(int(trk_result[index, 1])), 
-                        (int(trk_result[index, 2]+2), int(trk_result[index, 3])-3), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 
-                        0.6, 
-                        (0,0,0), 2)
+                    # # Index tag
+                    # cv2.putText(image, 
+                    #     str(int(trk_result[index, 1])), 
+                    #     (int(trk_result[index, 2]+2), int(trk_result[index, 3])-3), 
+                    #     cv2.FONT_HERSHEY_SIMPLEX, 
+                    #     0.6, 
+                    #     (0,0,0), 2)
 
                     # cv2.imshow('g',image)
                     # cv2.waitKey(0)
                     # exit()
 
-            video_writer.write(image)
+            # video_writer.write(image)
+            dir_path = 'output_video/person22/detected/'
+            frame_name = "{0:0=3d}".format(i) + ".jpg"
+            cv2.imwrite(dir_path + frame_name, image)
 
 
 if __name__ == '__main__':
-    result_dir = "/home/peng/darknet/sort/reid_output/"
+    result_dir = "/home/peng/darknet/det_mot/"
+    # result_dir = "/home/peng/darknet/sort/kf_output/"
     video_dir = "/home/peng/data/sort_data/images/"
     store_output(result_dir, video_dir)

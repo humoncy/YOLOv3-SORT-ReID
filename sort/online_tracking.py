@@ -9,8 +9,8 @@ import time
 from tqdm import tqdm
 from os.path import basename, splitext
 
-# from sort import Sort
-from reid_sort import Sort
+from sort import Sort
+# from reid_sort import Sort
 from bbox_utils import *
 from sort_utils import sort_nicely
 from utils import BoundBox
@@ -42,7 +42,7 @@ def online_tracking(data_dir, STORE=False):
     if not os.path.exists(data_dir):
         raise IOError("Invalid data path:", data_dir)
 
-    dn.set_gpu(1)
+    dn.set_gpu(0)
     # net = dn.load_net("../cfg/yolov3.cfg", "../yolov3.weights", 0)
     net = dn.load_net("../cfg/yolov3.cfg", "../yolov3-aerial.weights", 0)
     meta = dn.load_meta("../cfg/voc.data")
@@ -66,9 +66,14 @@ def online_tracking(data_dir, STORE=False):
     image_paths = sorted(glob.glob(os.path.join(data_dir, '*jpg')))
     sort_nicely(image_paths)
 
-    mot_tracker = Sort(max_age=5, min_hits=0) # create instance of the SORT tracker
+    ####################################################################################################3
+    mot_tracker = Sort(max_age=1, min_hits=3) # create instance of the SORT tracker
+    # mot_tracker = Sort(max_age=150, min_hits=3) # create instance of the SORT tracker
+    ####################################################################################################3
 
     total_time = 0.0
+    total_det_time = 0.0
+    total_sort_time = 0.0
 
     for i, image_path in enumerate(tqdm(image_paths)):
         image = cv2.imread(image_path)
@@ -78,24 +83,27 @@ def online_tracking(data_dir, STORE=False):
         results = dn.detect(net, meta, image_paths[i])
 
         detect_time = time.time() - track_start_time
+        total_det_time += detect_time
         
         sort_start_time = time.time()
 
         dets = results2dets(results, image.shape)
-        feats = np.zeros((dets.shape[0], 16))
-        for det_id in range(len(feats)):
-            x1 = int(dets[det_id, 0])
-            y1 = int(dets[det_id, 1])
-            x2 = int(dets[det_id, 2])
-            y2 = int(dets[det_id, 3])
-            feat = scn.compute(image[y1:y2, x1:x2])
-            feats[det_id] = feat
-        trackers = mot_tracker.update(dets, feats)
+        # feats = np.zeros((dets.shape[0], 16))
+        # for det_id in range(len(feats)):
+        #     x1 = int(dets[det_id, 0])
+        #     y1 = int(dets[det_id, 1])
+        #     x2 = int(dets[det_id, 2])
+        #     y2 = int(dets[det_id, 3])
+        #     feat = scn.compute(image[y1:y2, x1:x2])
+        #     feats[det_id] = feat
+        # trackers = mot_tracker.update(dets, feats)
+        trackers = mot_tracker.update(dets)
 
         end_time = time.time()
         cycle_time = end_time - track_start_time
         total_time += cycle_time
         sort_time = end_time - sort_start_time
+        total_sort_time += sort_time
 
         # print("#{} frame".format(i))
         # print(results)
@@ -125,29 +133,25 @@ def online_tracking(data_dir, STORE=False):
                         0.6, 
                         (0,0,0), 2)
 
-            cv2.imshow('h', image)
-            cv2.waitKey(0)
-            exit()
-
         #########################################################
         # FPS information
         cv2.putText(image, 
-                    'Tracking FPS = {:.2f}'.format(1 / cycle_time),
-                    (frame_width - 300, 25), 
+                    '   Tracking FPS = {:.2f}'.format(1 / cycle_time),
+                    (frame_width - 350, 25), 
                     cv2.FONT_HERSHEY_SIMPLEX, 
                     1e-3 * image.shape[0], 
                     (0,250,0), 2)
 
         cv2.putText(image, 
-                    '   YOLO FPS = {:.2f}'.format(1 / detect_time),
-                    (frame_width - 300, 55), 
+                    '      YOLO FPS = {:.2f}'.format(1 / detect_time),
+                    (frame_width - 350, 55), 
                     cv2.FONT_HERSHEY_SIMPLEX, 
                     1e-3 * image.shape[0], 
                     (0,250,0), 2)
 
         cv2.putText(image, 
-                    '   SORT FPS = {:.2f}'.format(1 / sort_time),
-                    (frame_width - 300, 75), 
+                    'SORT(Reid) FPS = {:.2f}'.format(1 / sort_time),
+                    (frame_width - 350, 75), 
                     cv2.FONT_HERSHEY_SIMPLEX, 
                     1e-3 * image.shape[0], 
                     (0,250,0), 2)
@@ -165,6 +169,8 @@ def online_tracking(data_dir, STORE=False):
 
     total_frames = i + 1
     print("Total Tracking took: %.3f for %d frames or %.1f FPS"%(total_time, total_frames, total_frames/total_time))    
+    print("Total Detection took: %.3f for %d frames or %.1f FPS"%(total_det_time, total_frames, total_frames/total_det_time))    
+    print("Total SORT took: %.3f for %d frames or %.1f FPS"%(total_sort_time, total_frames, total_frames/total_sort_time))    
 
 
 if __name__ == '__main__':

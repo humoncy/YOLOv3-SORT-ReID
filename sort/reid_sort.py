@@ -68,7 +68,6 @@ def cosine_distance(det_feature, trk_features):
 
   return max_cosine
 
-
 def convert_bbox_to_z(bbox):
   """
   Takes a bounding box in the form [x1,y1,x2,y2] and returns z in the form
@@ -129,7 +128,7 @@ class KalmanBoxTracker(object):
       KalmanBoxTracker.count += 1
     else:
       self.id = trk_id
-    self.history = []
+    self.history = [] # bbox history between updates
     self.hits = 0 # total number of updates
     self.hit_streak = 0 # consective number of updates (probationary perirod)
     self.age = 0
@@ -286,7 +285,7 @@ class Sort(object):
         # Pass probationary period
         if (trk.hit_streak >= self.min_hits or self.frame_count <= self.min_hits):
           ret.append(np.concatenate((d, [trk.id+1])).reshape(1,-1)) # +1 as MOT benchmark requires positive
-        elif trk.hits >= 30 and trk.time_since_update < self.min_hits:
+        elif trk.hits >= 30 and trk.time_since_update <= self.min_hits:
           ret.append(np.concatenate((d, [trk.id+1])).reshape(1,-1)) # +1 as MOT benchmark requires positive
           
     if(len(ret)>0):
@@ -312,7 +311,7 @@ if __name__ == '__main__':
     'sort': {
       'image_folder': '/home/peng/data/sort_data/images/',
       'annot_folder': '/home/peng/data/sort_data/annotations/',
-      'mot_det_folder': '/home/peng/darknet/det_mot/'
+      'mot_det_folder': '/home/peng/darknet/det_mot_thr45/'
     }
   }
   annots, videos, detections = get_data_lists(data['sort'])
@@ -330,10 +329,10 @@ if __name__ == '__main__':
     seq_dets = np.loadtxt(det, delimiter=',') # load detections
     video_name = splitext(basename(det))[0]
 
-    # if video_name != "person14_1":
+    # if video_name != "person14_3":
     #   continue
 
-    with open('reid_output/' + video_name + '.txt', 'w') as out_file:
+    with open('reid_thr45_output/' + video_name + '.txt', 'w') as out_file:
       print("Processing %s." % video_name)
       data_dir = videos[vid]
       image_paths = sorted(glob.glob(os.path.join(data_dir, '*jpg')))
@@ -381,7 +380,7 @@ if __name__ == '__main__':
         # if frame == 10:
         #   exit()
         
-    outputs += [os.getcwd() + '/reid_output/' + video_name + '.txt']
+    outputs += [os.getcwd() + '/reid_thr45_output/' + video_name + '.txt']
     KalmanBoxTracker.count = 0
 
   print("Total Tracking took: %.3f for %d frames or %.1f FPS"%(total_time,total_frames,total_frames/total_time))
