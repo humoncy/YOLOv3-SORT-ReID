@@ -58,6 +58,7 @@ $ python sort.py
 ##### SORT scripts
 - sort.py: basically original sort.py
 - reid_sort.py: sort+ReID
+    - Need scncd
 - sort_ukf.py: a little try of Unscented Kalman filter
 - reidsort_velicity.py: use this file for predicting target's velocity and position
 
