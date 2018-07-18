@@ -13,11 +13,12 @@ import time
 import numpy as np
 
 
-dn.set_gpu(1)
-# net = dn.load_net("cfg/yolov3.cfg", "yolov3.weights", 0)
-net = dn.load_net("cfg/yolov3.cfg", "yolov3-aerial.weights", 0)
+dn.set_gpu(0)
+net = dn.load_net("cfg/yolov3.cfg", "yolov3.weights", 0)
+meta = dn.load_meta("cfg/coco.data")
+# net = dn.load_net("cfg/yolov3.cfg", "yolov3-aerial.weights", 0)
 # net = dn.load_net("cfg/yolov3.cfg", "backup/yolov3-aerial_final.weights", 0)
-meta = dn.load_meta("cfg/aerial.data")
+# meta = dn.load_meta("cfg/aerial.data")
 
 # img_path = "data/original_.jpg"
 # # And then down here you could detect a lot more images like:

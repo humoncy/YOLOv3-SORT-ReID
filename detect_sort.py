@@ -8,7 +8,6 @@ from tqdm import tqdm
 from os.path import basename, splitext
 import glob
 import re
-
 import sys
 sys.path.append(os.path.join(os.getcwd(),'sort/'))
 from utils import BoundBox
@@ -50,10 +49,13 @@ def _main_(args):
     #   Make the model and Load trained weights
     ###############################
 
-    dn.set_gpu(1)
-    # net = dn.load_net("cfg/yolov3.cfg", "yolov3.weights", 0)
-    net = dn.load_net("cfg/yolov3.cfg", "yolov3-aerial.weights", 0)
-    meta = dn.load_meta("cfg/voc.data")
+    dn.set_gpu(0)
+    # Original YOLOv3 weights
+    net = dn.load_net("cfg/yolov3.cfg", "yolov3.weights", 0)
+    meta = dn.load_meta("cfg/coco.data")
+    # Aerial YOLOv3 weights
+    # net = dn.load_net("cfg/yolov3.cfg", "yolov3-aerial.weights", 0)
+    # meta = dn.load_meta("cfg/voc.data")
     ###############################
     #   Predict bounding boxes 
     ###############################
@@ -68,7 +70,8 @@ def _main_(args):
         image_paths = sorted(glob.glob(os.path.join(video_folder, '*jpg')))
         sort_nicely(image_paths)
 
-        with open('det_mot_thr45/' + video_name + '.txt', 'w') as out_file:
+        """ Remember to modify the following path """
+        with open('det_mot(before_ft)/' + video_name + '.txt', 'w') as out_file:
             for i in tqdm(range(len(image_paths))):
                 # image = cv2.imread(image_paths[i])
                 results = dn.detect(net, meta, image_paths[i], thresh=0.45, nms=0.5)

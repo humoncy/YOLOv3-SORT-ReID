@@ -6,6 +6,7 @@
 *.jpg
 *.pyc
 *.avi
+*.mp4
 *.txt
 bad.list
 old/

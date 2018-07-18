@@ -9,8 +9,13 @@ import matplotlib.cm
 from sort_utils import sort_nicely
 
 
-# [x_min y_min w h] to [x_min y_min x_max y_max]
 def xywh_to_xyxy(bboxes):
+    """ Convert bboxes of [x_min y_min w h] into [x_min y_min x_max y_max]
+        Params:
+            bboxes: ndarray of shape (#bbox, 4), bbox format: [x_min y_min w h]
+        Return:
+            bboxes: ndarray of shape (#bbox, 4), bbox format: [x_min y_min x_max y_max]
+    """
     if isinstance(bboxes, list):
         bboxes = np.array(bboxes)
     xyxy_bboxes = np.zeros_like(bboxes)
@@ -28,12 +33,17 @@ def xywh_to_xyxy(bboxes):
     
 
 def store_output(result_dir, video_dir):
+    """ Store tracking results to video
+        Params:
+            result_dir: string, path to tracking result directory
+            video_dir:  string, path to video frames
+        Return:
+            None, video will be stored in the store_path
+    """
     cmap = matplotlib.cm.get_cmap('tab20')
     ci = np.linspace(0,1,20)
     colours = cmap(ci)[:,:3]
     colours = colours[:,::-1] * 255
-    # print(colours)
-    # exit()
     
     r_paths = sorted(glob.glob(os.path.join(result_dir, '*.txt')))
     sort_nicely(r_paths)
@@ -45,10 +55,9 @@ def store_output(result_dir, video_dir):
         frame_height = 720
         video_name = splitext(basename(r_path))[0]
 
-
         ##############################################################################
         # Modify here to ouput only one video.
-        if video_name != 'person22':
+        if video_name != 'person14_1':
             continue
         ##############################################################################
 
@@ -72,38 +81,44 @@ def store_output(result_dir, video_dir):
             index_list = np.argwhere(trk_result[:, 0] == (i+1))
             if index_list.shape[0] != 0:
                 for index in index_list[:, 0]:
-                    color = colours[int(trk_result[index,1]-1)%20]
+                    target_index = trk_result[index,1]
+                    color = colours[int(target_index-1)%20]
                     cv2.rectangle(image, 
                         (int(trk_result[index, 2]),int(trk_result[index, 3])), 
                         (int(trk_result[index, 4]),int(trk_result[index, 5])), 
                         color, 3)
 
-                    # # Tag rectangle (filled rect)
-                    # cv2.rectangle(image, 
-                    #     (int(trk_result[index, 2])-2,int(trk_result[index, 3]-20)), 
-                    #     (int(trk_result[index, 2])+20+int(trk_result[index,1])//10 ,int(trk_result[index, 3])+1), 
-                    #     color, -1)
+                    if target_index//10 > 0:
+                        digit = 2
+                    else:
+                        digit = 1
 
-                    # # Index tag
-                    # cv2.putText(image, 
-                    #     str(int(trk_result[index, 1])), 
-                    #     (int(trk_result[index, 2]+2), int(trk_result[index, 3])-3), 
-                    #     cv2.FONT_HERSHEY_SIMPLEX, 
-                    #     0.6, 
-                    #     (0,0,0), 2)
+                    # Tag rectangle (filled rect)
+                    cv2.rectangle(image, 
+                        (int(trk_result[index, 2])-2,int(trk_result[index, 3]-20)), 
+                        (int(trk_result[index, 2])+10*digit+10 ,int(trk_result[index, 3])+1), 
+                        color, -1)
+
+                    # Index tag
+                    cv2.putText(image, 
+                        str(int(trk_result[index, 1])), 
+                        (int(trk_result[index, 2]+2), int(trk_result[index, 3])-3), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 
+                        0.6, 
+                        (0,0,0), 2)
 
                     # cv2.imshow('g',image)
                     # cv2.waitKey(0)
                     # exit()
 
-            # video_writer.write(image)
-            dir_path = 'output_video/person22/detected/'
-            frame_name = "{0:0=3d}".format(i) + ".jpg"
-            cv2.imwrite(dir_path + frame_name, image)
+            video_writer.write(image)
+            # dir_path = 'output_video/person22/detected/'
+            # frame_name = "{0:0=3d}".format(i) + ".jpg"
+            # cv2.imwrite(dir_path + frame_name, image)
 
 
 if __name__ == '__main__':
-    result_dir = "/home/peng/darknet/det_mot/"
-    # result_dir = "/home/peng/darknet/sort/kf_output/"
+    # result_dir = "/home/peng/darknet/det_mot/"
+    result_dir = "/home/peng/darknet/sort/reid_output/"
     video_dir = "/home/peng/data/sort_data/images/"
     store_output(result_dir, video_dir)

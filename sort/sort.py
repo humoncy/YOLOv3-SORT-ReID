@@ -159,6 +159,7 @@ def associate_detections_to_trackers(detections, trackers, iou_threshold=0.3):
   for d,det in enumerate(detections):
     for t,trk in enumerate(trackers):
       iou_matrix[d,t] = iou(det,trk)
+  # Solve assignment problem via Hungarian algo.
   matched_indices = linear_assignment(-iou_matrix)
   
   unmatched_detections = []
@@ -193,7 +194,7 @@ class Sort(object):
     """
     Sets key parameters for SORT
     """
-    self.max_age = max_age
+    self.max_age = max_age    # How many frames target could exist without detected
     self.min_hits = min_hits  # Probationary period
     self.trackers = []
     self.frame_count = 0
@@ -243,6 +244,7 @@ class Sort(object):
     i = len(self.trackers)
     for trk in reversed(self.trackers):
         d = trk.get_state()[0]
+        # 1. Kalman filter is used to predict how many un-detected frames 2. Probationary period
         if ( (trk.time_since_update < self.max_age)  and  (trk.hit_streak >= self.min_hits or self.frame_count <= self.min_hits) ):
           ret.append(np.concatenate((d, [trk.id+1])).reshape(1,-1)) # +1 as MOT benchmark requires positive
         i -= 1
@@ -269,11 +271,12 @@ if __name__ == '__main__':
   args = parse_args()
   evaluate = args.evaluate
 
+  # Provide folders to images, annotations, and detection results
   data = {
     'sort': {
       'image_folder': '/home/peng/data/sort_data/images/',
       'annot_folder': '/home/peng/data/sort_data/annotations/',
-      'mot_det_folder': '/home/peng/darknet/det_mot/'
+      'mot_det_folder': '/home/peng/darknet/det_mot(before_ft)/'
     }
   }
   annots, videos, detections = get_data_lists(data['sort'])
@@ -287,12 +290,13 @@ if __name__ == '__main__':
     os.makedirs('output')
   
   for det in detections:
-    mot_tracker = Sort(max_age=10, min_hits=3) # create instance of the SORT tracker
+    mot_tracker = Sort(max_age=1, min_hits=3) # create instance of the SORT tracker
     seq_dets = np.loadtxt(det, delimiter=',') # load detections
     video_name = splitext(basename(det))[0]
 
-    if video_name != "person14_1":
-      continue
+    # if video_name != "person14_1":
+        # Track only one video
+    #   continue
 
     with open('kf_output/' + video_name + '.txt', 'w') as out_file:
       print("Processing %s." % video_name)

@@ -5,6 +5,9 @@ import tensorflow as tf
 import copy
 import cv2
 
+""" Contains some functions may be used
+"""
+
 class BoundBox:
     def __init__(self, x, y, w, h, c = None, classes = None, tc = None):
         self.x     = x

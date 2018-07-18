@@ -7,11 +7,25 @@ import csv
 
 
 def isNAN(bbox):
+    """ Check whether bbox contains NAN or not.
+        Params:
+            bbox: ndarray
+        Return:
+            True if contains NAN, otherwise, False
+    """
     for value in bbox.flatten():
         if math.isnan(value):
             return True
+    return False
 
 def interval_overlap(interval_a, interval_b):
+    """ Compute intersection of two lines
+        Params:
+            interval_a: [a_min, a_max], an interval starts from a_min to a_max
+            interval_b: [b_min, b_max], an interval starts from b_min to b_max
+        Return:
+            length of intersection of the two intervals
+    """
     x1, x2 = interval_a
     x3, x4 = interval_b
 
@@ -27,7 +41,12 @@ def interval_overlap(interval_a, interval_b):
             return min(x2,x4) - x3  
 
 def bbox_iou(box1, box2):
-    """ Compute IOU between two bboxes in the form [x1,y1,w,h]
+    """ Compute IOU between two bounding boxes
+        Params:
+            box1: [x1, y1, w, h] of box1
+            box2: [x1, y1, w, h] of box2
+        Return:
+            IoU of two bboxes
     """
     x1_min = box1[0]
     x1_max = x1_min + box1[2]
@@ -49,6 +68,14 @@ def bbox_iou(box1, box2):
     return float(intersect) / union
 
 def average_IOU(annots, outputs, file_name):
+    """ Average IoU
+        Params:
+            annots : path list of annotations files
+            outputs: path list of tracking results (store in MOT format)
+            file_name: output .csv file name
+        Return:
+            Average IoU between results and GT
+    """
     nb_video = len(annots)
     total_frames = 0
     total_avg_iou = 0.0
@@ -81,9 +108,10 @@ def average_IOU(annots, outputs, file_name):
                 # No target in the frame
                 continue
 
+            # Find row indeices of this frame
             index_list = np.argwhere(mot_results[:, 0] == (fi+1))
-
             if index_list.shape[0] != 0:
+                # Without considering correct target ID
                 max_iou = 0.0
                 for index in index_list[:, 0]:
                     bbox = mot_results[index, 2:6]
@@ -125,6 +153,14 @@ def average_IOU(annots, outputs, file_name):
 
 
 def overlap_precision(annots, outputs, threshold):
+    """ Overlap precision (success rate) given overlap threshold (For drawing Success Plot)
+        Params:
+            annots : path list of annotations files
+            outputs: path list of tracking results (store in MOT format)
+            threshold: overlap threshold
+        Return:
+            Overlap precision or success rate
+    """
     nb_video = len(annots)
     total_precision = 0.0
     for i, annot in enumerate(annots):
@@ -169,8 +205,17 @@ def overlap_precision(annots, outputs, threshold):
 
 
 def success_plot_auc(ann, tra, det=None):
+    """ Draw Success Plot with Area Under Curve score
+        Params:
+            ann: path list of annotations files
+            tra: path list of tracking results (store in MOT format)
+            det: path list of detection results (store in MOT format)
+        Return:
+            None, Success Plot would be stored automatically
+    """
     fig = plt.figure("Success plot")
-    t = np.linspace(0.0, 1.0, 30)
+    sample_points = 30
+    t = np.linspace(0.0, 1.0, sample_points) 
     s = np.zeros_like(t)
     for i, threshold in enumerate(t):
         s[i] = overlap_precision(ann, tra, threshold)

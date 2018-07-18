@@ -28,6 +28,7 @@ import glob
 import time
 import cv2
 import argparse
+from tqdm import tqdm
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 from sort_utils import get_data_lists, sort_nicely
@@ -133,9 +134,11 @@ class KalmanBoxTracker(object):
     self.hit_streak = 0 # consective number of updates (probationary perirod)
     self.age = 0
 
-    self.features = [] # Gallery of target appearance features
+    self.features = []
     if feature is not None:
       self.features.append(feature)
+
+    self.predected_box = []
 
   def update(self,bbox,feature):
     """
@@ -150,7 +153,6 @@ class KalmanBoxTracker(object):
 
     self.features.append(feature)
     if len(self.features) > 100:
-      # Store the latest 100 target features
       self.features.pop(0)
 
   def predict(self):
@@ -166,6 +168,9 @@ class KalmanBoxTracker(object):
       self.hit_streak = 0
     self.time_since_update += 1
     self.history.append(convert_x_to_bbox(self.kf.x))
+
+    self.predected_box.append(self.history[-1][0])
+
     return self.history[-1]
 
   def get_state(self):
@@ -173,6 +178,27 @@ class KalmanBoxTracker(object):
     Returns the current bounding box estimate.
     """
     return convert_x_to_bbox(self.kf.x)
+
+  def get_velocity(self):
+    """
+    Returns the current velocity estimate.
+    """
+    u_dot = self.kf.x[4]
+    v_dot = self.kf.x[5]
+    s_dot = self.kf.x[6]
+
+    return np.array([u_dot, v_dot, s_dot]).reshape((1,3))
+
+  def get_predicted_bbox(self):
+    """
+    Returns the current bounding box predicted.
+    """
+    # print(self.history)
+    if not self.predected_box:
+        return self.get_state()
+    predicted_box = self.predected_box
+    self.predected_box = []
+    return predicted_box
 
 
 
@@ -195,8 +221,7 @@ def associate_detections_to_trackers(detections, features, trackers, iou_thresho
   for t in reversed(to_del):
     trackers.pop(t)
   if len(trks) != len(trackers):
-    # This situation haven't appeared when I was using.
-    raise Exception("Debug time!")
+    print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 
   if(len(trks)==0):
     return np.empty((0,2),dtype=int), np.arange(len(detections)), np.empty((0,5),dtype=int)
@@ -208,7 +233,6 @@ def associate_detections_to_trackers(detections, features, trackers, iou_thresho
     for t,trk in enumerate(trks):
       iou_matrix[d,t] = iou(det,trk)
       fcd_matrix[d,t] = cosine_distance(features[d,:], trackers[t].features)
-  # Assignment cost matrix is build from motion and appearance information
   cost_matrix = iou_matrix + fcd_matrix  
   matched_indices = linear_assignment(-cost_matrix)
   
@@ -278,6 +302,10 @@ class Sort(object):
     i = len(self.trackers)
     for trk in reversed(self.trackers):  # why reverse? pop later!
       d = trk.get_state()[0]
+      # Target velocity
+      v = trk.get_velocity()[0]
+      # Predicted target position of next frame
+      predicted_box = trk.get_predicted_bbox()[0]
         
       i -= 1
 
@@ -285,12 +313,11 @@ class Sort(object):
       if (trk.time_since_update > self.max_age):
         self.trackers.pop(i)
       else:
+        # Pass probationary period
         if (trk.hit_streak >= self.min_hits or self.frame_count <= self.min_hits):
-          # Probationary period
-          ret.append(np.concatenate((d, [trk.id+1])).reshape(1,-1)) # +1 as MOT benchmark requires positive
+          ret.append(np.concatenate((d, [trk.id+1], v, predicted_box)).reshape(1,-1)) # +1 as MOT benchmark requires positive
         elif trk.hits >= 30 and trk.time_since_update <= self.min_hits:
-          # When to predict tracking results by Kalman filter
-          ret.append(np.concatenate((d, [trk.id+1])).reshape(1,-1)) # +1 as MOT benchmark requires positive
+          ret.append(np.concatenate((d, [trk.id+1], v, predicted_box)).reshape(1,-1)) # +1 as MOT benchmark requires positive
           
     if(len(ret)>0):
       return np.concatenate(ret)
@@ -311,7 +338,6 @@ if __name__ == '__main__':
 
   scncd = scncd.SCNCD()
 
-  # Provide folders to images, annotations, and detection results
   data = {
     'sort': {
       'image_folder': '/home/peng/data/sort_data/images/',
@@ -334,15 +360,15 @@ if __name__ == '__main__':
     seq_dets = np.loadtxt(det, delimiter=',') # load detections
     video_name = splitext(basename(det))[0]
 
-    # if video_name != "person14_3":
-    #   continue
+    if video_name != "person14_1":
+      continue
 
-    with open('reid_output/' + video_name + '.txt', 'w') as out_file:
+    with open('velocity_output/' + video_name + '.txt', 'w') as out_file:
       print("Processing %s." % video_name)
       data_dir = videos[vid]
       image_paths = sorted(glob.glob(os.path.join(data_dir, '*jpg')))
       sort_nicely(image_paths)
-      for frame in range(int(seq_dets[:,0].max())):
+      for frame in tqdm(range(int(seq_dets[:,0].max()))):
         start_time = time.time()
       
         img = cv2.imread(image_paths[frame])
@@ -359,7 +385,6 @@ if __name__ == '__main__':
         dets[:,2:4] += dets[:,0:2] # convert [x1,y1,w,h] to [x1,y1,x2,y2]
 
         fe_s = time.time()
-        # Compute SCNCD feature of detected bbox
         feats = np.zeros((dets.shape[0], 16))
         for det_id in range(len(feats)):
           x1 = max(int(dets[det_id, 0]), 0)
@@ -380,13 +405,13 @@ if __name__ == '__main__':
         total_time += cycle_time
 
         for d in trackers:
-          print('%d,%d,%.2f,%.2f,%.2f,%.2f,1,-1,-1,-1' % (frame, d[4] ,d[0] ,d[1], d[2]-d[0], d[3]-d[1]), file=out_file)
+          print('%d,%d,%.2f,%.2f,%.2f,%.2f,1,-1,-1,-1,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f' % (frame, d[4] ,d[0] ,d[1], d[2]-d[0], d[3]-d[1], d[5], d[6], d[7], d[8], d[9], d[10], d[11]), file=out_file)
 
         # print("\n------------ {}th frmae done ---------------".format(frame))
         # if frame == 10:
         #   exit()
         
-    outputs += [os.getcwd() + '/reid_output/' + video_name + '.txt']
+    outputs += [os.getcwd() + '/velocity_output/' + video_name + '.txt']
     KalmanBoxTracker.count = 0
 
   print("Total Tracking took: %.3f for %d frames or %.1f FPS"%(total_time,total_frames,total_frames/total_time))
