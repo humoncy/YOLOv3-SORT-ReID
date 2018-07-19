@@ -51,9 +51,9 @@ $ python sort.py
 
 ### File description:
 
-##### Utility functions
-- bbox_utils.py
-- utils.py
+##### Path to data
+**Data paths are stored in this script, modify it when running on a new device**
+- config.py: check the script first to see your data paths
 
 ##### SORT scripts
 - sort.py: basically original sort.py
@@ -79,3 +79,6 @@ $ python sort.py
 - online_tracking.py
 - online_tracking_trajectory.py
 
+##### Utility functions
+- bbox_utils.py
+- utils.py

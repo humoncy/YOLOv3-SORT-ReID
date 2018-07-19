@@ -9,7 +9,9 @@ import time
 from tqdm import tqdm
 from os.path import basename, splitext
 
+# SORT
 # from sort import Sort
+# SORT(ReID)
 from reid_sort import Sort
 from bbox_utils import *
 from sort_utils import sort_nicely

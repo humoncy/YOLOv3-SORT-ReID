@@ -37,6 +37,7 @@ import csv
 import sys
 sys.path.append('/home/peng/Documents/scncd')
 import scncd
+from config import data
 
 
 @jit
@@ -312,14 +313,7 @@ if __name__ == '__main__':
   scncd = scncd.SCNCD()
 
   # Provide folders to images, annotations, and detection results
-  data = {
-    'sort': {
-      'image_folder': '/home/peng/data/sort_data/images/',
-      'annot_folder': '/home/peng/data/sort_data/annotations/',
-      'mot_det_folder': '/home/peng/darknet/det_mot/'
-    }
-  }
-  annots, videos, detections = get_data_lists(data['sort'])
+  annots, videos, detections = get_data_lists(data)
 
   outputs = []
 
