@@ -56,7 +56,7 @@ def online_tracking(data_dir, STORE=False):
     if not os.path.exists(data_dir):
         raise IOError("Invalid data path:", data_dir)
 
-    dn.set_gpu(0)
+    dn.set_gpu(0,1)
     # net = dn.load_net("../cfg/yolov3.cfg", "../yolov3.weights", 0)
     net = dn.load_net("../cfg/yolov3.cfg", "../yolov3-aerial.weights", 0)
     meta = dn.load_meta("../cfg/voc.data")

@@ -6,14 +6,14 @@ I modified it a little for research.
 - Hardware
     - GPU needed
 - Software
-    - Ubuntu
-    - Python2
+    - Ubuntu 16.04
+    - Python2.7
 
 ### Dependencies:
 
-1. Numpy
+1. Numpy1.14.1
 2. Matplotlib
-3. Opencv (compiled with ffmpeg support, otherwise you cannot read/write videos) <- important!
+3. Opencv3.4.1 (compiled with ffmpeg support, otherwise you cannot read/write videos) <- important!
 and other needed libraries (run the scripts and you'll know what to install)
 If you are running on the server under my account, use my virtual env directly
 Example:
@@ -57,20 +57,23 @@ $ python sort.py
 
 ##### SORT scripts
 - sort.py: basically original sort.py
-- reid_sort.py: sort+ReID
+- reid_sort.py: SORT(ReID)
     - Need scncd
-- sort_ukf.py: a little try of Unscented Kalman filter
+- (sort_ukf.py: a little try of Unscented Kalman filter)
 - reidsort_velicity.py: use this file for predicting target's velocity and position
 
 ##### Visualization
-- output2video.py
+- output2video.py:
+    - convert mot_format .txt results to video
 - output2video_velocity.py
+    - convert mot_format .txt results to video with velocity prediction
 
 ##### Evaluation
-- evaluation.py: contains Average IoU, Area Under Curve
+- (evaluation.py: contains Average IoU, Area Under Curve)
+    - (I seldom used the script before graduation.)
 
 ##### Darknet
-libdarknet.a and libdarknet.so are needed for using YOLO
+**libdarknet.a** and **libdarknet.so** are needed for using YOLO
 
 ##### Online tracking (Detect and track in one steps)
 - online_tracking.py
